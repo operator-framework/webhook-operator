@@ -1,7 +1,7 @@
 package v2
 
 import (
-	v1 "github.com/awgreene/webhook-operator/api/v1"
+	v1 "github.com/operator-framework/webhook-operator/api/v1"
 	"sigs.k8s.io/controller-runtime/pkg/conversion"
 )
 

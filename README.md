@@ -12,10 +12,10 @@ Built using [Kubebuilder](https://book.kubebuilder.io/)
 
 ```bash
 # Build the operator Image
-$ make docker-build IMG=quay.io/agreene/webhook-operator:latest
+$ make docker-build IMG=quay.io/olmtest/webhook-operator:latest
 
 # Push the image to docker
-$ docker push quay.io/agreene/webhook-operator:latest
+$ docker push quay.io/olmtest/webhook-operator:latest
 ```
 
 ## Deploy the Webhook Operator with Cert-Manager and Kubebuilder
@@ -36,7 +36,7 @@ $ kubectl apply --validate=false -f https://github.com/jetstack/cert-manager/rel
 
 ```bash
 # Deploy the Webhook Operator with Kubebuilder
-$ make deploy IMG=quay.io/agreene/webhook-operator:latest
+$ make deploy IMG=quay.io/olmtest/webhook-operator:latest
 
 # Check that the pods are up and running
 $ watch kubectl get pods -n webhook-operator-system
@@ -59,15 +59,15 @@ true
 ### Build a Bundle Image
 
 ```bash
-$ make bundle-build BUNDLE_IMG=quay.io/agreene/webhook-operator-bundle:latest
-$ docker push quay.io/agreene/webhook-operator-bundle:latest
+$ make bundle-build BUNDLE_IMG=quay.io/olmtest/webhook-operator-bundle:latest
+$ docker push quay.io/olmtest/webhook-operator-bundle:latest
 ```
 
 ### Build an Index
 
 ```bash
-$ opm index add --bundles quay.io/agreene/webhook-operator-bundle:latest --tag quay.io/agreene/webhook-operator-index:latest -c docker
-$ docker push quay.io/agreene/webhook-operator-index:latest
+$ opm index add --bundles quay.io/olmtest/webhook-operator-bundle:latest --tag quay.io/olmtest/webhook-operator-index:latest -c docker
+$ docker push quay.io/olmtest/webhook-operator-index:latest
 ```
 
 ### Deploy with OLM on Vanilla Kubernetes

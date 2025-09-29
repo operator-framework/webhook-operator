@@ -20,7 +20,10 @@ import (
 	"context"
 	"fmt"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	ctrl "sigs.k8s.io/controller-runtime"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
@@ -65,7 +68,9 @@ func (d *WebhookTestCustomDefaulter) Default(_ context.Context, obj runtime.Obje
 	}
 	webhooktestlog.Info("Defaulting for WebhookTest", "name", webhooktest.GetName())
 
-	// TODO(user): fill in your defaulting logic.
+	if !webhooktest.Spec.Mutate {
+		webhooktest.Spec.Mutate = true
+	}
 
 	return nil
 }
@@ -93,10 +98,7 @@ func (v *WebhookTestCustomValidator) ValidateCreate(_ context.Context, obj runti
 		return nil, fmt.Errorf("expected a WebhookTest object but got %T", obj)
 	}
 	webhooktestlog.Info("Validation for WebhookTest upon creation", "name", webhooktest.GetName())
-
-	// TODO(user): fill in your validation logic upon object creation.
-
-	return nil, nil
+	return nil, v.validateWebhookTest(webhooktest)
 }
 
 // ValidateUpdate implements webhook.CustomValidator so a webhook will be registered for the type WebhookTest.
@@ -106,10 +108,7 @@ func (v *WebhookTestCustomValidator) ValidateUpdate(_ context.Context, oldObj, n
 		return nil, fmt.Errorf("expected a WebhookTest object for the newObj but got %T", newObj)
 	}
 	webhooktestlog.Info("Validation for WebhookTest upon update", "name", webhooktest.GetName())
-
-	// TODO(user): fill in your validation logic upon object update.
-
-	return nil, nil
+	return nil, v.validateWebhookTest(webhooktest)
 }
 
 // ValidateDelete implements webhook.CustomValidator so a webhook will be registered for the type WebhookTest.
@@ -123,4 +122,19 @@ func (v *WebhookTestCustomValidator) ValidateDelete(ctx context.Context, obj run
 	// TODO(user): fill in your validation logic upon object deletion.
 
 	return nil, nil
+}
+
+func (v *WebhookTestCustomValidator) validateWebhookTest(w *webhookv1.WebhookTest) error {
+	var allErrs field.ErrorList
+	if !w.Spec.Valid {
+		allErrs = append(allErrs, field.Invalid(field.NewPath("spec").Child("schedule"), w.Spec.Valid, "Spec.Valid must be true"))
+	}
+
+	if len(allErrs) != 0 {
+		return apierrors.NewInvalid(
+			schema.GroupKind{Group: "test.operators.coreos.com", Kind: "WebhookTest"},
+			w.Name, allErrs)
+	}
+
+	return nil
 }

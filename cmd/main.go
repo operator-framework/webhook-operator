@@ -38,7 +38,7 @@ import (
 	webhookv1 "github.com/operator-framework/webhook-operator/api/v1"
 	webhookv2 "github.com/operator-framework/webhook-operator/api/v2"
 	"github.com/operator-framework/webhook-operator/internal/controller"
-	webhookv1 "github.com/operator-framework/webhook-operator/internal/webhook/v1"
+	whv1 "github.com/operator-framework/webhook-operator/internal/webhook/v1"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -190,7 +190,7 @@ func main() {
 	}
 	// nolint:goconst
 	if os.Getenv("ENABLE_WEBHOOKS") != "false" {
-		if err := webhookv1.SetupWebhookTestWebhookWithManager(mgr); err != nil {
+		if err := whv1.SetupWebhookTestWebhookWithManager(mgr); err != nil {
 			setupLog.Error(err, "unable to create webhook", "webhook", "WebhookTest")
 			os.Exit(1)
 		}

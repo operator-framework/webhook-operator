@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1
+package v2
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -25,6 +25,11 @@ import (
 
 // WebhookTestSpec defines the desired state of WebhookTest
 type WebhookTestSpec struct {
+	// Conversion is an example field of WebhookTest. Edit WebhookTest_types.go to remove/update
+	Conversion Conversion `json:"conversion"`
+}
+
+type Conversion struct {
 	// Valid must be set to true or the validation webhook will reject the resource.
 	Valid bool `json:"valid"`
 
@@ -58,7 +63,6 @@ type WebhookTestStatus struct {
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
-// +kubebuilder:storageversion
 
 // WebhookTest is the Schema for the webhooktests API
 type WebhookTest struct {

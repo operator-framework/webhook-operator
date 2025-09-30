@@ -9,7 +9,7 @@
   "package": "webhook-operator",
   "entries": [
     {
-      "name": "webhook-operator.{{ VERSION }}"
+      "name": "webhook-operator.v{{ VERSION }}"
     }
   ]
 }

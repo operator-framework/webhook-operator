@@ -368,10 +368,10 @@ build-catalog: opm
 	@# Create base catalog from template
 	sed "s/{{ VERSION }}/$(VERSION)/g" catalog/catalog.tpl > catalog/catalog.json
 	@# Add bundle FBC
-	$(OPM) render ./bundle
+	$(OPM) render ./bundle >> catalog/catalog.json
 
 .PHONY: catalog-docker-buildx
-catalog-docker-buildx: build-catalog ## Build and push docker image for the manager for cross-platform support
+catalog-docker-buildx: bundle build-catalog ## Build and push docker image for the manager for cross-platform support
 	- $(CONTAINER_TOOL) buildx create --name webhook-operator-index-builder
 	$(CONTAINER_TOOL) buildx use webhook-operator-index-builder
 	- $(CONTAINER_TOOL) buildx build $(DOCKER_BUILDX_FLAGS) --platform=$(PLATFORMS) --tag ${CATALOG_IMG} -f catalog.Dockerfile .

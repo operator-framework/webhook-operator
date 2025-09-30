@@ -3,7 +3,8 @@
 FROM quay.io/operator-framework/opm:latest as builder
 
 # Copy FBC root into image at /configs and pre-populate serve cache
-ADD catalog /configs
+ADD catalog/.indexignore /configs/.indexignore
+ADD catalog/catalog.json /configs/catalog.json
 RUN ["/bin/opm", "serve", "/configs", "--cache-dir=/tmp/cache", "--cache-only"]
 
 FROM quay.io/operator-framework/opm:latest

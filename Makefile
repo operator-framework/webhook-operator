@@ -3,7 +3,7 @@
 # To re-generate a bundle for another specific version without changing the standard setup, you can:
 # - use the VERSION as arg of the bundle target (e.g make bundle VERSION=0.0.2)
 # - use environment variables to overwrite this value (e.g export VERSION=0.0.2)
-VERSION ?= 0.0.5
+VERSION ?= 0.0.0
 
 # CHANNELS define the bundle channels used in the bundle.
 # Add a new line here if you would like to change its default config. (E.g CHANNELS = "candidate,fast,stable")
@@ -195,20 +195,6 @@ docker-buildx: ## Build and push docker image for the manager for cross-platform
 	- $(CONTAINER_TOOL) buildx rm webhook-operator-builder
 	rm Dockerfile.cross
 
-.PHONY: bundle-docker-buildx
-bundle-docker-buildx: ## Build and push bundle image with cross-platform support
-	- $(CONTAINER_TOOL) buildx create --name webhook-operator-bundle-builder
-	$(CONTAINER_TOOL) buildx use webhook-operator-bundle-builder
-	- $(CONTAINER_TOOL) buildx build --push --platform=$(PLATFORMS) --tag ${BUNDLE_IMG} -f bundle.Dockerfile .
-	- $(CONTAINER_TOOL) buildx rm webhook-operator-bundle-builder
-
-.PHONY: index-docker-buildx
-index-docker-buildx: ## Build and push docker image for the manager for cross-platform support
-	- $(CONTAINER_TOOL) buildx create --name webhook-operator-index-builder
-	$(CONTAINER_TOOL) buildx use webhook-operator-index-builder
-	- $(CONTAINER_TOOL) buildx build --push --platform=$(PLATFORMS) --tag ${CATALOG_IMG} -f catalog.Dockerfile .
-	- $(CONTAINER_TOOL) buildx rm webhook-operator-index-builder
-
 .PHONY: build-installer
 build-installer: manifests generate kustomize ## Generate a consolidated YAML with CRDs and deployment.
 	mkdir -p dist
@@ -337,3 +323,44 @@ bundle-build: ## Build the bundle image.
 .PHONY: bundle-push
 bundle-push: ## Push the bundle image.
 	$(MAKE) docker-push IMG=$(BUNDLE_IMG)
+
+.PHONY: bundle-docker-buildx
+bundle-docker-buildx: ## Build and push bundle image with cross-platform support
+	- $(CONTAINER_TOOL) buildx create --name webhook-operator-bundle-builder
+	$(CONTAINER_TOOL) buildx use webhook-operator-bundle-builder
+	- $(CONTAINER_TOOL) buildx build --push --platform=$(PLATFORMS) --tag ${BUNDLE_IMG} -f bundle.Dockerfile .
+	- $(CONTAINER_TOOL) buildx rm webhook-operator-bundle-builder
+
+.PHONY: opm
+OPM = $(LOCALBIN)/opm
+opm: ## Download opm locally if necessary.
+ifeq (,$(wildcard $(OPM)))
+ifeq (,$(shell which opm 2>/dev/null))
+	@{ \
+	set -e ;\
+	mkdir -p $(dir $(OPM)) ;\
+	OS=$(shell go env GOOS) && ARCH=$(shell go env GOARCH) && \
+	curl -sSLo $(OPM) https://github.com/operator-framework/operator-registry/releases/download/v1.55.0/$${OS}-$${ARCH}-opm ;\
+	chmod +x $(OPM) ;\
+	}
+else
+OPM = $(shell which opm)
+endif
+endif
+
+.PHONY: build-catalog
+build-catalog: opm
+	@# Create base catalog from template
+	sed "s/{{ VERSION }}/v$(VERSION)/g" catalog/catalog.tpl > catalog/catalog.json
+	@# Add bundle FBC
+	$(OPM) render $(BUNDLE_IMG) >> catalog/catalog.json
+
+.PHONY: catalog-docker-buildx
+catalog-docker-buildx: build-catalog ## Build and push docker image for the manager for cross-platform support
+	- $(CONTAINER_TOOL) buildx create --name webhook-operator-index-builder
+	$(CONTAINER_TOOL) buildx use webhook-operator-index-builder
+	- $(CONTAINER_TOOL) buildx build --push --platform=$(PLATFORMS) --tag ${CATALOG_IMG} -f catalog.Dockerfile .
+	- $(CONTAINER_TOOL) buildx rm webhook-operator-index-builder
+
+.PHONY: release
+release: docker-buildx bundle-docker-buildx catalog-docker-buildx

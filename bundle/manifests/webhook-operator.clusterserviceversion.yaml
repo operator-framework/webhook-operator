@@ -30,10 +30,10 @@ metadata:
         }
       ]
     capabilities: Basic Install
-    createdAt: "2025-09-29T13:06:16Z"
+    createdAt: "2025-09-30T13:14:21Z"
     operators.operatorframework.io/builder: operator-sdk-v1.41.1
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v4
-  name: webhook-operator.v0.0.5
+  name: webhook-operator.v0.0.0
   namespace: placeholder
 spec:
   apiservicedefinitions: {}
@@ -126,7 +126,7 @@ spec:
                 - --webhook-cert-path=/tmp/k8s-webhook-server/serving-certs
                 command:
                 - /manager
-                image: quay.io/olmtest/webhook-operator:v0.0.5
+                image: quay.io/olmtest/webhook-operator:v0.0.0
                 livenessProbe:
                   httpGet:
                     path: /healthz
@@ -228,7 +228,7 @@ spec:
   maturity: alpha
   provider:
     name: operator-framework
-  version: 0.0.5
+  version: 0.0.0
   webhookdefinitions:
   - admissionReviewVersions:
     - v1

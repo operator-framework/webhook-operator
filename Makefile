@@ -3,7 +3,7 @@
 # To re-generate a bundle for another specific version without changing the standard setup, you can:
 # - use the VERSION as arg of the bundle target (e.g make bundle VERSION=0.0.2)
 # - use environment variables to overwrite this value (e.g export VERSION=0.0.2)
-VERSION ?= 0.0.5
+VERSION ?= 0.0.0
 
 # CHANNELS define the bundle channels used in the bundle.
 # Add a new line here if you would like to change its default config. (E.g CHANNELS = "candidate,fast,stable")
@@ -24,6 +24,11 @@ BUNDLE_DEFAULT_CHANNEL := --default-channel=$(DEFAULT_CHANNEL)
 endif
 BUNDLE_METADATA_OPTS ?= $(BUNDLE_CHANNELS) $(BUNDLE_DEFAULT_CHANNEL)
 
+RELEASE ?= false
+ifeq ($(RELEASE), true)
+	DOCKER_BUILDX_FLAGS += --push
+endif
+
 # IMAGE_TAG_BASE defines the docker.io namespace and part of the image name for remote images.
 # This variable is used to construct full image tags for bundle and catalog images.
 #
@@ -31,12 +36,14 @@ BUNDLE_METADATA_OPTS ?= $(BUNDLE_CHANNELS) $(BUNDLE_DEFAULT_CHANNEL)
 # quay.io/olmtest/webhook-operator:$VERSION and quay.io/olmtest/webhook-operator-bundle:$VERSION.
 IMAGE_TAG_BASE ?= quay.io/olmtest/webhook-operator
 
+TAG ?= v$(VERSION)
+
 # BUNDLE_IMG defines the image:tag used for the bundle.
 # You can use it as an arg. (E.g make bundle-build BUNDLE_IMG=<some-registry>/<project-name-bundle>:<tag>)
-BUNDLE_IMG ?= $(IMAGE_TAG_BASE)-bundle:v$(VERSION)
+BUNDLE_IMG ?= $(IMAGE_TAG_BASE)-bundle:$(TAG)
 
 # The image tag given to the resulting catalog image (e.g. make catalog-build CATALOG_IMG=example.com/operator-catalog:v0.2.0).
-CATALOG_IMG ?= $(IMAGE_TAG_BASE)-index:v$(VERSION)
+CATALOG_IMG ?= $(IMAGE_TAG_BASE)-index:$(TAG)
 
 # BUNDLE_GEN_FLAGS are the flags passed to the operator-sdk generate bundle command
 BUNDLE_GEN_FLAGS ?= -q --overwrite --version $(VERSION) $(BUNDLE_METADATA_OPTS)
@@ -54,7 +61,7 @@ endif
 OPERATOR_SDK_VERSION ?= v1.41.1
 
 # Image URL to use all building/pushing image targets
-IMG ?= quay.io/olmtest/webhook-operator:v$(VERSION)
+IMG ?= quay.io/olmtest/webhook-operator:$(TAG)
 
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
 ifeq (,$(shell go env GOBIN))
@@ -115,6 +122,14 @@ vet: ## Run go vet against code.
 .PHONY: test
 test: manifests generate fmt vet setup-envtest ## Run tests.
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test $$(go list ./... | grep -v /e2e) -coverprofile cover.out
+
+.PHONY: tidy
+tidy:
+	go mod tidy
+
+.PHONY: verify
+verify: tidy fmt manifests generate
+	git diff --exit-code
 
 # TODO(user): To use a different vendor for e2e tests, modify the setup under 'tests/e2e'.
 # The default setup assumes Kind is pre-installed and builds/loads the Manager Docker image locally.
@@ -191,23 +206,9 @@ docker-buildx: ## Build and push docker image for the manager for cross-platform
 	sed -e '1 s/\(^FROM\)/FROM --platform=\$$\{BUILDPLATFORM\}/; t' -e ' 1,// s//FROM --platform=\$$\{BUILDPLATFORM\}/' Dockerfile > Dockerfile.cross
 	- $(CONTAINER_TOOL) buildx create --name webhook-operator-builder
 	$(CONTAINER_TOOL) buildx use webhook-operator-builder
-	- $(CONTAINER_TOOL) buildx build --push --platform=$(PLATFORMS) --tag ${IMG} -f Dockerfile.cross .
+	- $(CONTAINER_TOOL) buildx build $(DOCKER_BUILDX_FLAGS) --platform=$(PLATFORMS) --tag ${IMG} -f Dockerfile.cross .
 	- $(CONTAINER_TOOL) buildx rm webhook-operator-builder
 	rm Dockerfile.cross
-
-.PHONY: bundle-docker-buildx
-bundle-docker-buildx: ## Build and push bundle image with cross-platform support
-	- $(CONTAINER_TOOL) buildx create --name webhook-operator-bundle-builder
-	$(CONTAINER_TOOL) buildx use webhook-operator-bundle-builder
-	- $(CONTAINER_TOOL) buildx build --push --platform=$(PLATFORMS) --tag ${BUNDLE_IMG} -f bundle.Dockerfile .
-	- $(CONTAINER_TOOL) buildx rm webhook-operator-bundle-builder
-
-.PHONY: index-docker-buildx
-index-docker-buildx: ## Build and push docker image for the manager for cross-platform support
-	- $(CONTAINER_TOOL) buildx create --name webhook-operator-index-builder
-	$(CONTAINER_TOOL) buildx use webhook-operator-index-builder
-	- $(CONTAINER_TOOL) buildx build --push --platform=$(PLATFORMS) --tag ${CATALOG_IMG} -f catalog.Dockerfile .
-	- $(CONTAINER_TOOL) buildx rm webhook-operator-index-builder
 
 .PHONY: build-installer
 build-installer: manifests generate kustomize ## Generate a consolidated YAML with CRDs and deployment.
@@ -337,3 +338,44 @@ bundle-build: ## Build the bundle image.
 .PHONY: bundle-push
 bundle-push: ## Push the bundle image.
 	$(MAKE) docker-push IMG=$(BUNDLE_IMG)
+
+.PHONY: bundle-docker-buildx
+bundle-docker-buildx: bundle ## Build and push bundle image with cross-platform support
+	- $(CONTAINER_TOOL) buildx create --name webhook-operator-bundle-builder
+	$(CONTAINER_TOOL) buildx use webhook-operator-bundle-builder
+	- $(CONTAINER_TOOL) buildx build $(DOCKER_BUILDX_FLAGS) --platform=$(PLATFORMS) --tag ${BUNDLE_IMG} -f bundle.Dockerfile .
+	- $(CONTAINER_TOOL) buildx rm webhook-operator-bundle-builder
+
+.PHONY: opm
+OPM = $(LOCALBIN)/opm
+opm: ## Download opm locally if necessary.
+ifeq (,$(wildcard $(OPM)))
+ifeq (,$(shell which opm 2>/dev/null))
+	@{ \
+	set -e ;\
+	mkdir -p $(dir $(OPM)) ;\
+	OS=$(shell go env GOOS) && ARCH=$(shell go env GOARCH) && \
+	curl -sSLo $(OPM) https://github.com/operator-framework/operator-registry/releases/latest/download/$${OS}-$${ARCH}-opm ;\
+	chmod +x $(OPM) ;\
+	}
+else
+OPM = $(shell which opm)
+endif
+endif
+
+.PHONY: build-catalog
+build-catalog: opm
+	@# Create base catalog from template
+	sed "s/{{ VERSION }}/$(VERSION)/g" catalog/catalog.tpl > catalog/catalog.json
+	@# Add bundle FBC
+	$(OPM) render ./bundle
+
+.PHONY: catalog-docker-buildx
+catalog-docker-buildx: build-catalog ## Build and push docker image for the manager for cross-platform support
+	- $(CONTAINER_TOOL) buildx create --name webhook-operator-index-builder
+	$(CONTAINER_TOOL) buildx use webhook-operator-index-builder
+	- $(CONTAINER_TOOL) buildx build $(DOCKER_BUILDX_FLAGS) --platform=$(PLATFORMS) --tag ${CATALOG_IMG} -f catalog.Dockerfile .
+	- $(CONTAINER_TOOL) buildx rm webhook-operator-index-builder
+
+.PHONY: release
+release: docker-buildx bundle-docker-buildx catalog-docker-buildx

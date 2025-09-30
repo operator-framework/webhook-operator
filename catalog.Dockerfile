@@ -1,9 +1,10 @@
 # The builder image is expected to contain
 # /bin/opm (with serve subcommand)
-FROM quay.io/operator-framework/opm:latest as builder
+FROM quay.io/operator-framework/opm:latest AS builder
 
 # Copy FBC root into image at /configs and pre-populate serve cache
-ADD catalog /configs
+ADD catalog/.indexignore /configs/.indexignore
+ADD catalog/catalog.json /configs/catalog.json
 RUN ["/bin/opm", "serve", "/configs", "--cache-dir=/tmp/cache", "--cache-only"]
 
 FROM quay.io/operator-framework/opm:latest

@@ -3,7 +3,7 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     cert-manager.io/inject-ca-from: webhook-operator-system/webhook-operator-serving-cert
-    controller-gen.kubebuilder.io/version: v0.18.0
+    controller-gen.kubebuilder.io/version: v0.19.0
   creationTimestamp: null
   name: webhooktests.webhook.operators.coreos.io
 spec:

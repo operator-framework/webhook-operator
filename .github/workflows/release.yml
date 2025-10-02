@@ -40,24 +40,14 @@ jobs:
           if [[ $GITHUB_REF == refs/tags/* ]]; then
             # Release tags.
             echo VERSION="$(echo "${GITHUB_REF#refs/tags/}" | sed 's/^v//')" >> $GITHUB_ENV
-            echo RELEASE=true >> $GITHUB_ENV
+            echo ENABLE_RELEASE_PIPELINE=true >> $GITHUB_ENV
           elif [[ $GITHUB_REF == refs/heads/main ]]; then
             # 'main' branch build.
             echo TAG=snapshot >> $GITHUB_ENV
-            echo RELEASE=true >> $GITHUB_ENV
+            echo ENABLE_RELEASE_PIPELINE=true >> $GITHUB_ENV
           fi
 
       - name: Release
         run: make release
-
-      - name: Create Release
-        id: create_release
-        uses: actions/create-release@v1
-        if: startsWith(github.ref, 'refs/tags/')
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: ${{ github.ref }}
-          release_name: Release ${{ github.ref }}
-          draft: false
-          prerelease: false
+          GITHUB_TOKEN: ${{ github.token }}

@@ -164,15 +164,3 @@ changelog:
 release:
   disable: '{{ ne .Env.ENABLE_RELEASE_PIPELINE "true" }}'
   mode: replace
-#  extra_files:
-#    - glob: '{{ .Env.STANDARD_RELEASE_MANIFEST }}'
-#    - glob: '{{ .Env.STANDARD_RELEASE_INSTALL }}'
-#    - glob: '{{ .Env.EXPERIMENTAL_RELEASE_MANIFEST }}'
-#    - glob: '{{ .Env.EXPERIMENTAL_RELEASE_INSTALL }}'
-#    - glob: '{{ .Env.RELEASE_CATALOGS }}'
-#  header: |
-#    ## Installation
-#
-#    ```bash
-#    curl -L -s https://github.com/operator-framework/operator-controller/releases/download/{{ .Tag }}/install.sh | bash -s
-#    ```

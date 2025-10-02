@@ -131,3 +131,10 @@ conversion:
   mutate: true
   valid: true
 ```
+
+### Cutting new release instructions
+
+1. Update the BUNDLE_VERSION variable in the Makefile to the desired version
+2. Run `make generate manifests bundle fmt`
+3. Merge changes
+4. Create and push git tag with the same version as BUNDLE_VERSION

@@ -24,11 +24,6 @@ BUNDLE_DEFAULT_CHANNEL := --default-channel=$(DEFAULT_CHANNEL)
 endif
 BUNDLE_METADATA_OPTS ?= $(BUNDLE_CHANNELS) $(BUNDLE_DEFAULT_CHANNEL)
 
-RELEASE ?= false
-ifeq ($(RELEASE), true)
-	DOCKER_BUILDX_FLAGS += --push
-endif
-
 # IMAGE_TAG_BASE defines the docker.io namespace and part of the image name for remote images.
 # This variable is used to construct full image tags for bundle and catalog images.
 #
@@ -40,10 +35,10 @@ TAG ?= v$(VERSION)
 
 # BUNDLE_IMG defines the image:tag used for the bundle.
 # You can use it as an arg. (E.g make bundle-build BUNDLE_IMG=<some-registry>/<project-name-bundle>:<tag>)
-BUNDLE_IMG ?= $(IMAGE_TAG_BASE)-bundle:$(TAG)
+BUNDLE_IMG_BASE ?= $(IMAGE_TAG_BASE)-bundle
 
 # The image tag given to the resulting catalog image (e.g. make catalog-build CATALOG_IMG=example.com/operator-catalog:v0.2.0).
-CATALOG_IMG ?= $(IMAGE_TAG_BASE)-index:$(TAG)
+CATALOG_IMG_BASE ?= $(IMAGE_TAG_BASE)-index
 
 # BUNDLE_GEN_FLAGS are the flags passed to the operator-sdk generate bundle command
 BUNDLE_GEN_FLAGS ?= -q --overwrite --version $(VERSION) $(BUNDLE_METADATA_OPTS)
@@ -58,6 +53,8 @@ endif
 
 # Image URL to use all building/pushing image targets
 IMG ?= quay.io/olmtest/webhook-operator:$(TAG)
+BUNDLE_IMAGE = $(BUNDLE_IMG_BASE):$(TAG)
+CATALOG_IMAGE = $(CATALOG_IMG_BASE):$(TAG)
 
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
 ifeq (,$(shell go env GOBIN))
@@ -176,7 +173,10 @@ lint-config: $(GOLANGCI_LINT) ## Verify golangci-lint linter configuration
 	$(GOLANGCI_LINT) config verify
 
 ##@ Build
-
+ifeq ($(origin CGO_ENABLED), undefined)
+CGO_ENABLED := 0
+endif
+export CGO_ENABLED
 
 export GIT_REPO := $(shell go list -m)
 export VERSION_PATH := ${GIT_REPO}/internal/shared/version
@@ -190,7 +190,14 @@ export GO_BUILD_LDFLAGS := -s -w \
 
 .PHONY: build
 build: manifests generate fmt vet ## Build manager binary.
-	go build $(GO_BUILD_FLAGS) $(GO_BUILD_EXTRA_FLAGS) -tags '$(GO_BUILD_TAGS)' -ldflags '$(GO_BUILD_LDFLAGS)' -gcflags '$(GO_BUILD_GCFLAGS)' -asmflags '$(GO_BUILD_ASMFLAGS)' -o bin/manager cmd/main.go
+	go build $(GO_BUILD_FLAGS) $(GO_BUILD_EXTRA_FLAGS) -tags '$(GO_BUILD_TAGS)' -ldflags '$(GO_BUILD_LDFLAGS)' -gcflags '$(GO_BUILD_GCFLAGS)' -asmflags '$(GO_BUILD_ASMFLAGS)' -o $(BUILDBIN)/manager cmd/main.go
+
+.PHONY: build-linux go-build-linux
+build-linux: go-build-linux #EXHELP Build manager binary for GOOS=linux and local GOARCH.
+go-build-linux: BUILDBIN := bin/linux
+go-build-linux: export GOOS=linux
+go-build-linux: export GOARCH=amd64
+go-build-linux: build
 
 .PHONY: run
 run: manifests generate fmt vet ## Run a controller from your host.
@@ -200,29 +207,12 @@ run: manifests generate fmt vet ## Run a controller from your host.
 # (i.e. docker build --platform linux/arm64). However, you must enable docker buildKit for it.
 # More info: https://docs.docker.com/develop/develop-images/build_enhancements/
 .PHONY: docker-build
-docker-build: ## Build docker image with the manager.
-	$(CONTAINER_TOOL) build -t ${IMG} .
+docker-build: build-linux ## Build docker image with the manager.
+	$(CONTAINER_TOOL) build -t ${IMG} -f Dockerfile bin/linux
 
 .PHONY: docker-push
 docker-push: ## Push docker image with the manager.
 	$(CONTAINER_TOOL) push ${IMG}
-
-# PLATFORMS defines the target platforms for the manager image be built to provide support to multiple
-# architectures. (i.e. make docker-buildx IMG=myregistry/mypoperator:0.0.1). To use this option you need to:
-# - be able to use docker buildx. More info: https://docs.docker.com/build/buildx/
-# - have enabled BuildKit. More info: https://docs.docker.com/develop/develop-images/build_enhancements/
-# - be able to push the image to your registry (i.e. if you do not set a valid value via IMG=<myregistry/image:<tag>> then the export will fail)
-# To adequately provide solutions that are compatible with multiple platforms, you should consider using this option.
-PLATFORMS ?= linux/arm64,linux/amd64,linux/s390x,linux/ppc64le
-.PHONY: docker-buildx
-docker-buildx: ## Build and push docker image for the manager for cross-platform support
-	# copy existing Dockerfile and insert --platform=${BUILDPLATFORM} into Dockerfile.cross, and preserve the original Dockerfile
-	sed -e '1 s/\(^FROM\)/FROM --platform=\$$\{BUILDPLATFORM\}/; t' -e ' 1,// s//FROM --platform=\$$\{BUILDPLATFORM\}/' Dockerfile > Dockerfile.cross
-	- $(CONTAINER_TOOL) buildx create --name webhook-operator-builder
-	$(CONTAINER_TOOL) buildx use webhook-operator-builder
-	- $(CONTAINER_TOOL) buildx build $(DOCKER_BUILDX_FLAGS) --platform=$(PLATFORMS) --tag ${IMG} -f Dockerfile.cross .
-	- $(CONTAINER_TOOL) buildx rm webhook-operator-builder
-	rm Dockerfile.cross
 
 .PHONY: build-installer
 build-installer: manifests generate $(KUSTOMIZE) ## Generate a consolidated YAML with CRDs and deployment.
@@ -291,26 +281,24 @@ bundle-build: ## Build the bundle image.
 bundle-push: ## Push the bundle image.
 	$(MAKE) docker-push IMG=$(BUNDLE_IMG)
 
-.PHONY: bundle-docker-buildx
-bundle-docker-buildx: bundle ## Build and push bundle image with cross-platform support
-	- $(CONTAINER_TOOL) buildx create --name webhook-operator-bundle-builder
-	$(CONTAINER_TOOL) buildx use webhook-operator-bundle-builder
-	- $(CONTAINER_TOOL) buildx build $(DOCKER_BUILDX_FLAGS) --platform=$(PLATFORMS) --tag ${BUNDLE_IMG} -f bundle.Dockerfile .
-	- $(CONTAINER_TOOL) buildx rm webhook-operator-bundle-builder
-
-.PHONY: build-catalog
-build-catalog: $(OPM)
+.PHONY: catalog
+catalog: $(OPM)
 	@# Create base catalog from template
 	sed "s/{{ VERSION }}/$(VERSION)/g" catalog/catalog.tpl > catalog/catalog.json
 	@# Add bundle FBC
 	$(OPM) render ./bundle >> catalog/catalog.json
 
-.PHONY: catalog-docker-buildx
-catalog-docker-buildx: bundle build-catalog ## Build and push docker image for the manager for cross-platform support
-	- $(CONTAINER_TOOL) buildx create --name webhook-operator-index-builder
-	$(CONTAINER_TOOL) buildx use webhook-operator-index-builder
-	- $(CONTAINER_TOOL) buildx build $(DOCKER_BUILDX_FLAGS) --platform=$(PLATFORMS) --tag ${CATALOG_IMG} -f catalog.Dockerfile .
-	- $(CONTAINER_TOOL) buildx rm webhook-operator-index-builder
+
+ifeq ($(origin ENABLE_RELEASE_PIPELINE), undefined)
+ENABLE_RELEASE_PIPELINE := false
+endif
+ifeq ($(origin GORELEASER_ARGS), undefined)
+GORELEASER_ARGS := --snapshot --clean
+endif
+
+export ENABLE_RELEASE_PIPELINE
+export GORELEASER_ARGS
 
 .PHONY: release
-release: docker-buildx bundle-docker-buildx catalog-docker-buildx
+release: $(GORELEASER) bundle catalog #EXHELP Runs goreleaser. By default, this will run only as a snapshot and will not publish any artifacts unless it is run with different arguments. To override the arguments, run with "GORELEASER_ARGS=...". When run as a github action from a tag, this target will publish a full release.
+	CONTROLLER_IMAGE=$(IMAGE_TAG_BASE) BUNDLE_IMAGE=$(BUNDLE_IMG_BASE) CATALOG_IMAGE=$(CATALOG_IMG_BASE) TAG=$(TAG) $(GORELEASER) $(GORELEASER_ARGS)

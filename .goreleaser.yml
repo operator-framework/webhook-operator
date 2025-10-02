@@ -1,0 +1,178 @@
+before:
+  hooks:
+    - go mod tidy
+    - go mod download
+builds:
+  - id: controller-binary
+    main: ./cmd
+    binary: manager
+    asmflags: "{{ .Env.GO_BUILD_ASMFLAGS }}"
+    gcflags: "{{ .Env.GO_BUILD_GCFLAGS }}"
+    ldflags: "{{ .Env.GO_BUILD_LDFLAGS }}"
+    tags:
+      - "{{ .Env.GO_BUILD_TAGS }}"
+    mod_timestamp: "{{ .CommitTimestamp }}"
+    goos:
+      - linux
+    goarch:
+      - amd64
+      - arm64
+      - ppc64le
+      - s390x
+dockers:
+  # controller images
+  - image_templates:
+      - "{{ .Env.CONTROLLER_IMAGE }}:{{ .Env.TAG }}-amd64"
+    dockerfile: Dockerfile
+    goos: linux
+    goarch: amd64
+    use: buildx
+    build_flag_templates:
+      - "--platform=linux/amd64"
+  - image_templates:
+      - "{{ .Env.CONTROLLER_IMAGE }}:{{ .Env.TAG }}-arm64"
+    dockerfile: Dockerfile
+    goos: linux
+    goarch: arm64
+    use: buildx
+    build_flag_templates:
+      - "--platform=linux/arm64"
+  - image_templates:
+      - "{{ .Env.CONTROLLER_IMAGE }}:{{ .Env.TAG }}-ppc64le"
+    dockerfile: Dockerfile
+    goos: linux
+    goarch: ppc64le
+    use: buildx
+    build_flag_templates:
+      - "--platform=linux/ppc64le"
+  - image_templates:
+      - "{{ .Env.CONTROLLER_IMAGE }}:{{ .Env.TAG }}-s390x"
+    dockerfile: Dockerfile
+    goos: linux
+    goarch: s390x
+    use: buildx
+    build_flag_templates:
+      - "--platform=linux/s390x"
+  # bundle images
+  - image_templates:
+      - "{{ .Env.BUNDLE_IMAGE }}:{{ .Env.TAG }}-amd64"
+    dockerfile: bundle.Dockerfile
+    goos: linux
+    goarch: amd64
+    use: buildx
+    extra_files:
+      - bundle
+    build_flag_templates:
+      - "--platform=linux/amd64"
+  - image_templates:
+      - "{{ .Env.BUNDLE_IMAGE }}:{{ .Env.TAG }}-arm64"
+    dockerfile: bundle.Dockerfile
+    goos: linux
+    goarch: arm64
+    use: buildx
+    extra_files:
+      - bundle
+    build_flag_templates:
+      - "--platform=linux/arm64"
+  - image_templates:
+      - "{{ .Env.BUNDLE_IMAGE }}:{{ .Env.TAG }}-ppc64le"
+    dockerfile: bundle.Dockerfile
+    goos: linux
+    goarch: ppc64le
+    use: buildx
+    extra_files:
+      - bundle
+    build_flag_templates:
+      - "--platform=linux/ppc64le"
+  - image_templates:
+      - "{{ .Env.BUNDLE_IMAGE }}:{{ .Env.TAG }}-s390x"
+    dockerfile: bundle.Dockerfile
+    goos: linux
+    goarch: s390x
+    use: buildx
+    extra_files:
+      - bundle
+    build_flag_templates:
+      - "--platform=linux/s390x"
+  # catalog images
+  - image_templates:
+      - "{{ .Env.CATALOG_IMAGE }}:{{ .Env.TAG }}-amd64"
+    dockerfile: catalog.Dockerfile
+    goos: linux
+    goarch: amd64
+    use: buildx
+    extra_files:
+      - catalog
+    build_flag_templates:
+      - "--platform=linux/amd64"
+  - image_templates:
+      - "{{ .Env.CATALOG_IMAGE }}:{{ .Env.TAG }}-arm64"
+    dockerfile: catalog.Dockerfile
+    goos: linux
+    goarch: arm64
+    use: buildx
+    extra_files:
+      - catalog
+    build_flag_templates:
+      - "--platform=linux/arm64"
+  - image_templates:
+      - "{{ .Env.CATALOG_IMAGE }}:{{ .Env.TAG }}-ppc64le"
+    dockerfile: catalog.Dockerfile
+    goos: linux
+    goarch: ppc64le
+    use: buildx
+    extra_files:
+      - catalog
+    build_flag_templates:
+      - "--platform=linux/ppc64le"
+  - image_templates:
+      - "{{ .Env.CATALOG_IMAGE }}:{{ .Env.TAG }}-s390x"
+    dockerfile: catalog.Dockerfile
+    goos: linux
+    goarch: s390x
+    use: buildx
+    extra_files:
+      - catalog
+    build_flag_templates:
+      - "--platform=linux/s390x"
+docker_manifests:
+  - name_template: "{{ .Env.CONTROLLER_IMAGE }}:{{ .Env.TAG }}"
+    image_templates:
+      - "{{ .Env.CONTROLLER_IMAGE }}:{{ .Env.TAG }}-amd64"
+      - "{{ .Env.CONTROLLER_IMAGE }}:{{ .Env.TAG }}-arm64"
+      - "{{ .Env.CONTROLLER_IMAGE }}:{{ .Env.TAG }}-ppc64le"
+      - "{{ .Env.CONTROLLER_IMAGE }}:{{ .Env.TAG }}-s390x"
+  - name_template: "{{ .Env.CONTROLLER_IMAGE }}:{{ .Env.TAG }}"
+    image_templates:
+      - "{{ .Env.BUNDLE_IMAGE }}:{{ .Env.TAG }}-amd64"
+      - "{{ .Env.BUNDLE_IMAGE }}:{{ .Env.TAG }}-arm64"
+      - "{{ .Env.BUNDLE_IMAGE }}:{{ .Env.TAG }}-ppc64le"
+      - "{{ .Env.BUNDLE_IMAGE }}:{{ .Env.TAG }}-s390x"
+  - name_template: "{{ .Env.BUNDLE_IMAGE }}:{{ .Env.TAG }}"
+    image_templates:
+      - "{{ .Env.CATALOG_IMAGE }}:{{ .Env.TAG }}-amd64"
+      - "{{ .Env.CATALOG_IMAGE }}:{{ .Env.TAG }}-arm64"
+      - "{{ .Env.CATALOG_IMAGE }}:{{ .Env.TAG }}-ppc64le"
+      - "{{ .Env.CATALOG_IMAGE }}:{{ .Env.TAG }}-s390x"
+checksum:
+  name_template: 'checksums.txt'
+snapshot:
+  name_template: "{{ incpatch .Version }}-next"
+changelog:
+  use: github-native
+  disable: '{{ ne .Env.ENABLE_RELEASE_PIPELINE "true" }}'
+release:
+  disable: '{{ ne .Env.ENABLE_RELEASE_PIPELINE "true" }}'
+  mode: replace
+#  extra_files:
+#    - glob: '{{ .Env.STANDARD_RELEASE_MANIFEST }}'
+#    - glob: '{{ .Env.STANDARD_RELEASE_INSTALL }}'
+#    - glob: '{{ .Env.EXPERIMENTAL_RELEASE_MANIFEST }}'
+#    - glob: '{{ .Env.EXPERIMENTAL_RELEASE_INSTALL }}'
+#    - glob: '{{ .Env.RELEASE_CATALOGS }}'
+#  header: |
+#    ## Installation
+#
+#    ```bash
+#    curl -L -s https://github.com/operator-framework/operator-controller/releases/download/{{ .Tag }}/install.sh | bash -s
+#    ```

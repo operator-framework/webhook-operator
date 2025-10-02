@@ -267,11 +267,14 @@ envtest-k8s-bins: $(SETUP_ENVTEST)
 	$(SETUP_ENVTEST) use -p env $(ENVTEST_VERSION) $(SETUP_ENVTEST_BIN_DIR_OVERRIDE)
 
 .PHONY: bundle
-bundle: manifests $(KUSTOMIZE) $(OPERATOR_SDK) ## Generate bundle manifests and metadata, then validate generated files.
+bundle: manifests $(KUSTOMIZE) $(OPERATOR_SDK) $(YQ) ## Generate bundle manifests and metadata, then validate generated files.
 	$(OPERATOR_SDK) generate kustomize manifests -q
 	cd config/manager && $(KUSTOMIZE) edit set image controller=$(IMG)
 	$(KUSTOMIZE) build config/manifests | $(OPERATOR_SDK) generate bundle $(BUNDLE_GEN_FLAGS)
 	$(OPERATOR_SDK) bundle validate ./bundle
+	# remove cluster service version creation timestamp to not generate changes everytime the bundle is rebuilt
+	$(YQ) -i 'del(.metadata.annotations.createdAt)' bundle/manifests/webhook-operator.clusterserviceversion.yaml
+
 
 .PHONY: bundle-build
 bundle-build: ## Build the bundle image.

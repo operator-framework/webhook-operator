@@ -43,7 +43,6 @@ jobs:
             echo ENABLE_RELEASE_PIPELINE=true >> $GITHUB_ENV
           elif [[ $GITHUB_REF == refs/heads/main ]]; then
             echo TAG=snapshot >> $GITHUB_ENV
-            echo GORELEASER_ARGS="--clean" >> $GITHUB_ENV
           fi
 
       - name: Release

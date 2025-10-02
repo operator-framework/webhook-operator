@@ -3,7 +3,7 @@
 # To re-generate a bundle for another specific version without changing the standard setup, you can:
 # - use the VERSION as arg of the bundle target (e.g make bundle VERSION=0.0.2)
 # - use environment variables to overwrite this value (e.g export VERSION=0.0.2)
-VERSION ?= 0.0.0
+VERSION ?= 0.0.5
 
 # CHANNELS define the bundle channels used in the bundle.
 # Add a new line here if you would like to change its default config. (E.g CHANNELS = "candidate,fast,stable")
@@ -267,11 +267,14 @@ envtest-k8s-bins: $(SETUP_ENVTEST)
 	$(SETUP_ENVTEST) use -p env $(ENVTEST_VERSION) $(SETUP_ENVTEST_BIN_DIR_OVERRIDE)
 
 .PHONY: bundle
-bundle: manifests $(KUSTOMIZE) $(OPERATOR_SDK) ## Generate bundle manifests and metadata, then validate generated files.
+bundle: manifests $(KUSTOMIZE) $(OPERATOR_SDK) $(YQ) ## Generate bundle manifests and metadata, then validate generated files.
 	$(OPERATOR_SDK) generate kustomize manifests -q
 	cd config/manager && $(KUSTOMIZE) edit set image controller=$(IMG)
 	$(KUSTOMIZE) build config/manifests | $(OPERATOR_SDK) generate bundle $(BUNDLE_GEN_FLAGS)
 	$(OPERATOR_SDK) bundle validate ./bundle
+	# remove cluster service version creation timestamp to not generate changes everytime the bundle is rebuilt
+	$(YQ) -i 'del(.metadata.annotations.createdAt)' bundle/manifests/webhook-operator.clusterserviceversion.yaml
+
 
 .PHONY: bundle-build
 bundle-build: ## Build the bundle image.

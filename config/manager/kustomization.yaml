@@ -5,4 +5,4 @@ kind: Kustomization
 images:
 - name: controller
   newName: quay.io/olmtest/webhook-operator
-  newTag: v0.0.0
+  newTag: v0.0.5

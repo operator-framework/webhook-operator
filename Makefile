@@ -52,7 +52,7 @@ ifeq ($(USE_IMAGE_DIGESTS), true)
 endif
 
 # Image URL to use all building/pushing image targets
-IMG ?= quay.io/olmtest/webhook-operator:$(TAG)
+IMG ?= $(IMAGE_TAG_BASE):$(TAG)
 BUNDLE_IMAGE = $(BUNDLE_IMG_BASE):$(TAG)
 CATALOG_IMAGE = $(CATALOG_IMG_BASE):$(TAG)
 

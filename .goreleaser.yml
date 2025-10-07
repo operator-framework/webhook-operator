@@ -142,13 +142,13 @@ docker_manifests:
       - "{{ .Env.CONTROLLER_IMAGE }}:{{ .Env.TAG }}-arm64"
       - "{{ .Env.CONTROLLER_IMAGE }}:{{ .Env.TAG }}-ppc64le"
       - "{{ .Env.CONTROLLER_IMAGE }}:{{ .Env.TAG }}-s390x"
-  - name_template: "{{ .Env.CONTROLLER_IMAGE }}:{{ .Env.TAG }}"
+  - name_template: "{{ .Env.BUNDLE_IMAGE }}:{{ .Env.TAG }}"
     image_templates:
       - "{{ .Env.BUNDLE_IMAGE }}:{{ .Env.TAG }}-amd64"
       - "{{ .Env.BUNDLE_IMAGE }}:{{ .Env.TAG }}-arm64"
       - "{{ .Env.BUNDLE_IMAGE }}:{{ .Env.TAG }}-ppc64le"
       - "{{ .Env.BUNDLE_IMAGE }}:{{ .Env.TAG }}-s390x"
-  - name_template: "{{ .Env.BUNDLE_IMAGE }}:{{ .Env.TAG }}"
+  - name_template: "{{ .Env.CATALOG_IMAGE }}:{{ .Env.TAG }}"
     image_templates:
       - "{{ .Env.CATALOG_IMAGE }}:{{ .Env.TAG }}-amd64"
       - "{{ .Env.CATALOG_IMAGE }}:{{ .Env.TAG }}-arm64"

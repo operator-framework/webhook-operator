@@ -285,11 +285,11 @@ bundle-push: ## Push the bundle image.
 	$(MAKE) docker-push IMG=$(BUNDLE_IMG)
 
 .PHONY: catalog
-catalog: $(OPM)
+catalog: $(OPM) $(YQ)
 	@# Create base catalog from template
 	sed "s/{{ VERSION }}/$(VERSION)/g" catalog/catalog.tpl > catalog/catalog.json
 	@# Add bundle FBC
-	$(OPM) render ./bundle >> catalog/catalog.json
+	$(OPM) render ./bundle | $(YQ) -o json -I 2 '.image = "$(BUNDLE_IMAGE)"' >> catalog/catalog.json
 
 
 ifeq ($(origin ENABLE_RELEASE_PIPELINE), undefined)
